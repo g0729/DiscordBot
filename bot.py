@@ -83,6 +83,7 @@ async def on_voice_state_update(member, before, after):
         text_channel = discord.utils.get(guild.text_channels, name="일반")
         embed.add_field(name=":exit:", value="사용자가 없어서 자동으로 퇴장합니다.", inline=False)
         await text_channel.send(embed=embed)
+        await update_panel()
         await voice_client.disconnect()  # 음성 채널에서 나가기
         channel = voice_client.channel
         print(f"{channel.name} 채널에서 자동으로 퇴장했습니다.")
@@ -135,7 +136,7 @@ async def add(ctx, *, url):
         await play_next(ctx)
 
 
-async def update_panel(ctx, title=None, thumbnail_url=None):
+async def update_panel(title=None, thumbnail_url=None):
     """음악 컨트롤 패널의 제목과 썸네일 업데이트"""
     global panel
 
@@ -148,11 +149,13 @@ async def update_panel(ctx, title=None, thumbnail_url=None):
     # 제목 업데이트
     if title:
         embed.title = f"🎵 현재 재생 중: {title}"
-
+    else:
+        embed.title = "🎵 현재 재생중인 음악이 없습니다"
     # 썸네일 업데이트
     if thumbnail_url:
         embed.set_image(url=thumbnail_url)
-
+    else:
+        embed.set_image(url=None)
     # 패널 메시지 수정
     await panel.edit(embed=embed)
 
@@ -199,7 +202,7 @@ async def play_next(ctx):
 
         ctx.voice_client.play(player, after=after_playing)
         if panel:
-            await update_panel(ctx, player.title, player.thumbnail)
+            await update_panel(player.title, player.thumbnail)
         await ctx.send(f"🎶 재생 중: {player.title}", delete_after=5)
     else:
         is_playing = False
