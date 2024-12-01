@@ -13,6 +13,8 @@ discord.opus.load_opus("/opt/homebrew/lib/libopus.dylib")
 
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+music_queue_lock = asyncio.Lock()  # 대기열 동기화를 위한 락 생성
+
 panel = None
 intents = discord.Intents.default()
 intents.messages = True
@@ -118,7 +120,7 @@ async def on_message(message):
         except:
             await message.delete()
             return
-        await ctx.invoke(bot.get_command("add"), url=message.content)
+        await add(ctx, url=message.content)
         await message.delete()
     # 명령어 처리를 위해 추가
     await bot.process_commands(message)
@@ -131,22 +133,30 @@ is_playing = False
 @bot.command()
 async def add(ctx, *, url):
     """음악 대기열에 곡 추가"""
+    global music_queue_lock
     async with ctx.typing():
-        player = await YTDLSource.from_url(url, loop=bot.loop, stream=True)
+        async with music_queue_lock:  # 락을 사용하여 동기화
+            try:
+                # URL에서 플레이어 데이터 가져오기
+                player = await YTDLSource.from_url(url, loop=bot.loop, stream=True)
 
-        # 곡 정보를 딕셔너리로 대기열에 추가
-        music_queue.append(player)
+                # 곡 정보를 대기열에 추가
+                music_queue.append(player)
 
-    embed = discord.Embed(
-        title="🎵 대기열에 추가되었습니다",
-        description=player.title,
-        color=0x1DB954,
-    )
-    embed.set_thumbnail(url=player.thumbnail)
-    await ctx.send(embed=embed, delete_after=5)
+                # 대기열 추가 알림
+                embed = discord.Embed(
+                    title="🎵 대기열에 추가되었습니다",
+                    description=player.title,
+                    color=0x1DB954,
+                )
+                embed.set_thumbnail(url=player.thumbnail)
+                await ctx.send(embed=embed, delete_after=5)
 
-    if not is_playing:
-        await play_next(ctx)
+                if not is_playing:
+                    await play_next(ctx)
+
+            except Exception as e:
+                await ctx.send(f"❌ 오류가 발생했습니다: {e}")
 
 
 async def update_panel(title=None, thumbnail_url=None):
