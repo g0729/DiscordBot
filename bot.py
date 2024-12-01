@@ -202,12 +202,7 @@ async def play_next(ctx):
         is_playing = True
         player = music_queue.pop(0)
 
-        def after_playing(error):
-            if error:
-                print(f"Player error: {error}")
-            asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
-
-        ctx.voice_client.play(player, after=after_playing)
+        ctx.voice_client.play(player, after=play_next)
         if panel:
             await update_panel(player.title, player.thumbnail)
     else:
