@@ -31,7 +31,7 @@ async def join(ctx):
 
     if ctx.author.voice is None:
         embed.add_field(name=":exclamation:", value="음성 채널에 유저가 존재하지 않습니다. 1명 이상 입장해주세요.")
-        await ctx.send(embed=embed)
+        await ctx.send(embed=embed, delete_after=5)
         raise commands.CommandInvokeError("사용자가 존재하는 음성 채널을 찾지 못했습니다.")
 
     channel = ctx.author.voice.channel
@@ -81,12 +81,15 @@ async def on_voice_state_update(member, before, after):
 
     if voice_client and len(voice_client.channel.members) == 1:  # 봇만 남아있다면
         text_channel = discord.utils.get(guild.text_channels, name="일반")
-        embed.add_field(name=":exit:", value="사용자가 없어서 자동으로 퇴장합니다.", inline=False)
-        await text_channel.send(embed=embed)
+        embed.add_field(
+            name=":exit:",
+            value="사용자가 없어서 자동으로 퇴장합니다.",
+            inline=False,
+        )
+        await text_channel.send(embed=embed, delete_after=5)
         await update_panel()
         await voice_client.disconnect()  # 음성 채널에서 나가기
         channel = voice_client.channel
-        print(f"{channel.name} 채널에서 자동으로 퇴장했습니다.")
 
 
 def is_in_music_channel():
@@ -104,7 +107,11 @@ async def on_message(message):
 
     if message.channel.name == music_channel:
         ctx = await bot.get_context(message)  # 명령어 컨텍스트 생성
-        await ctx.invoke(bot.get_command("join"))
+        try:
+            await ctx.invoke(bot.get_command("join"))
+        except:
+            await message.delete()
+            return
         await ctx.invoke(bot.get_command("add"), url=message.content)
         await message.delete()
     # 명령어 처리를 위해 추가
@@ -203,10 +210,9 @@ async def play_next(ctx):
         ctx.voice_client.play(player, after=after_playing)
         if panel:
             await update_panel(player.title, player.thumbnail)
-        await ctx.send(f"🎶 재생 중: {player.title}", delete_after=5)
     else:
         is_playing = False
-        await ctx.send("🎵 대기열이 비어 있습니다.", delete_after=5)
+        await ctx.send("🎵 대기열이 비어 있습니다.", delete_after=10)
 
 
 class YTDLSource(discord.PCMVolumeTransformer):
