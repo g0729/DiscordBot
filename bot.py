@@ -74,6 +74,8 @@ async def create_music_channel(ctx):
 
 @bot.event
 async def on_voice_state_update(member, before, after):
+    global music_queue
+    global is_playing
     guild = member.guild
     embed = discord.Embed(title="디스코드 봇 도우미(개발용)", description="음성 채널 개발용 디스코드 봇", color=0x00FF56)
     # 음성 채널 상태 변화 감지
@@ -87,6 +89,10 @@ async def on_voice_state_update(member, before, after):
             inline=False,
         )
         await text_channel.send(embed=embed, delete_after=5)
+
+        music_queue = []
+        is_playing = False
+
         await update_panel()
         await voice_client.disconnect()  # 음성 채널에서 나가기
         channel = voice_client.channel
@@ -165,22 +171,6 @@ async def update_panel(title=None, thumbnail_url=None):
         embed.set_image(url=None)
     # 패널 메시지 수정
     await panel.edit(embed=embed)
-
-
-@bot.command()
-async def queue(ctx):
-    """현재 대기열 보기"""
-    if not music_queue:
-        await ctx.send("🎵 대기열이 비어 있습니다.", delete_after=5)
-    else:
-        embed = discord.Embed(
-            title="🎶 현재 대기열",
-            color=0x1DB954,
-        )
-        for i, track in enumerate(music_queue, start=1):
-            embed.add_field(name=f"{i}. {track['title']}", value=f"[링크]({track['url']})", inline=False)
-        embed.set_thumbnail(url=music_queue[0]["thumbnail"])
-        await ctx.send(embed=embed, delete_after=10)
 
 
 @bot.command()
