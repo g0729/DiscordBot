@@ -1,3 +1,4 @@
 config.py
 test.py
 cookies.txt
+__pycache__
