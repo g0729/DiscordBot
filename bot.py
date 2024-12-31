@@ -194,6 +194,27 @@ async def remove(ctx, index: int):
     await ctx.send(f"🎵 대기열에서 제거되었습니다: {removed}", delete_after=5)
 
 
+async def recreate_panel(ctx):
+    global panel
+
+    if panel is not None:
+        return
+
+    channel = discord.utils.get(ctx.guild.text_channels, name=music_channel)
+
+    async for msg in channel.history(limit=5):
+        await msg.delete()
+    embed = discord.Embed(
+        title="🎵 음악 컨트롤 패널",
+        description="아래 버튼을 사용해 음악을 제어하세요!",
+        color=0x1DB954,
+    )
+    embed.set_footer(text="음악 봇 | 디스코드")
+
+    view = MusicControlPanel(bot, ctx)
+    panel = await channel.send(embed=embed, view=view)  # 패널 메시지 저장
+
+
 async def play_next(ctx):
     """대기열에서 다음 곡 재생"""
     global is_playing
@@ -202,7 +223,8 @@ async def play_next(ctx):
         is_playing = True
         player = music_queue.pop(0)
 
-        ctx.voice_client.play(player, after=play_next)
+        ctx.voice_client.play(player, after=lambda _: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
+        await recreate_panel(ctx)
         if panel:
             await update_panel(player.title, player.thumbnail)
     else:
