@@ -120,7 +120,7 @@ async def on_message(message):
         except:
             await message.delete()
             return
-        await add(ctx, url=message.content)
+        await add(ctx, url=message.content, author=message.author.nick)
         await message.delete()
     # 명령어 처리를 위해 추가
     await bot.process_commands(message)
@@ -131,7 +131,7 @@ is_playing = False
 
 
 @bot.command()
-async def add(ctx, *, url):
+async def add(ctx, *, url, author):
     """음악 대기열에 곡 추가"""
     global music_queue_lock
     async with ctx.typing():
@@ -141,7 +141,7 @@ async def add(ctx, *, url):
                 player = await YTDLSource.from_url(url, loop=bot.loop, stream=True)
 
                 # 곡 정보를 대기열에 추가
-                music_queue.append(player)
+                music_queue.append((player, author))
 
                 # 대기열 추가 알림
                 embed = discord.Embed(
@@ -159,7 +159,7 @@ async def add(ctx, *, url):
                 await ctx.send(f"❌ 오류가 발생했습니다: {e}")
 
 
-async def update_panel(title=None, thumbnail_url=None):
+async def update_panel(title=None, thumbnail_url=None, author=None):
     """음악 컨트롤 패널의 제목과 썸네일 업데이트"""
     global panel
 
@@ -179,6 +179,9 @@ async def update_panel(title=None, thumbnail_url=None):
         embed.set_image(url=thumbnail_url)
     else:
         embed.set_image(url=None)
+
+    if author:
+        embed.set_footer(text=f"음악 봇 | 디스코드 신청자 : {author}")
     # 패널 메시지 수정
     await panel.edit(embed=embed)
 
@@ -194,25 +197,43 @@ async def remove(ctx, index: int):
     await ctx.send(f"🎵 대기열에서 제거되었습니다: {removed}", delete_after=5)
 
 
-async def recreate_panel(ctx):
+@bot.command(aliases=["테스트"])
+async def retrieve_panel(ctx):
     global panel
 
     if panel is not None:
         return
 
     channel = discord.utils.get(ctx.guild.text_channels, name=music_channel)
+    if not channel:
+        return
 
-    async for msg in channel.history(limit=5):
-        await msg.delete()
-    embed = discord.Embed(
-        title="🎵 음악 컨트롤 패널",
-        description="아래 버튼을 사용해 음악을 제어하세요!",
-        color=0x1DB954,
-    )
-    embed.set_footer(text="음악 봇 | 디스코드")
+    async for msg in channel.history(limit=50):
+        # 혹시 이미 panel을 찾았으면 반복문 중단
+        if panel is not None:
+            break
 
-    view = MusicControlPanel(bot, ctx)
-    panel = await channel.send(embed=embed, view=view)  # 패널 메시지 저장
+        # 메시지가 봇이 보낸 것이고 임베드를 가지고 있는지 확인
+        if msg.author.id == bot.user.id and msg.embeds:
+            embed = msg.embeds[0]
+            footer_text = embed.footer.text if embed.footer and embed.footer.text else ""
+
+            # footer에 특정 문자열(패널 식별용)이 있는지 확인
+            if "음악 봇 | 디스코드" in footer_text:
+                # == 패널 메시지 찾음 ==
+                panel = msg
+
+                # 새 View를 달아준다
+                new_view = MusicControlPanel(bot, ctx)
+                await panel.edit(view=new_view)
+
+                await ctx.send("기존 패널 메시지를 재연결했습니다!", delete_after=3)
+            else:
+                # 봇 메시지지만 패널이 아닌 다른 임베드라면 지울 수도 있음
+                await msg.delete()
+        else:
+            # 일반 유저 메시지 또는 임베드 없는 메시지면 지우는 로직
+            await msg.delete()
 
 
 async def play_next(ctx):
@@ -221,15 +242,18 @@ async def play_next(ctx):
 
     if music_queue:
         is_playing = True
-        player = music_queue.pop(0)
-
+        temp = music_queue.pop()
+        player = temp[0]
+        author = temp[1]
         ctx.voice_client.play(player, after=lambda _: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
-        await recreate_panel(ctx)
-        if panel:
-            await update_panel(player.title, player.thumbnail)
+
+        if panel is None:
+            await retrieve_panel(ctx)
+
+        await update_panel(player.title, player.thumbnail, author)
     else:
         is_playing = False
-        await ctx.send("🎵 대기열이 비어 있습니다.", delete_after=10)
+        await ctx.send("🎵 대기열이 비어 있습니다.", delete_after=3)
 
 
 class YTDLSource(discord.PCMVolumeTransformer):
