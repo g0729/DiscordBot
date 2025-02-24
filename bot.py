@@ -9,7 +9,6 @@ from config import TOKEN, ytdl_format_options, ffmpeg_options, music_channel
 
 # Suppress noise about console usage from errors
 youtube_dl.utils.bug_reports_message = lambda: ""
-discord.opus.load_opus("/opt/homebrew/lib/libopus.dylib")
 
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
@@ -156,7 +155,7 @@ async def add(ctx, *, url, author):
                     await play_next(ctx)
 
             except Exception as e:
-                await ctx.send(f"❌ 오류가 발생했습니다: {e}")
+                await ctx.send(f"❌ 오류가 발생했습니다: {e}",delete_after=5)
 
 
 async def update_panel(title=None, thumbnail_url=None, author=None):
@@ -164,7 +163,7 @@ async def update_panel(title=None, thumbnail_url=None, author=None):
     global panel
 
     if not panel:
-        return  # 패널 메시지가 없는 경우 무시
+        return 
 
     # 기존 임베드 가져오기
     embed = panel.embeds[0]
@@ -201,17 +200,12 @@ async def remove(ctx, index: int):
 async def retrieve_panel(ctx):
     global panel
 
-    if panel is not None:
-        return
-
     channel = discord.utils.get(ctx.guild.text_channels, name=music_channel)
     if not channel:
         return
 
     async for msg in channel.history(limit=50):
         # 혹시 이미 panel을 찾았으면 반복문 중단
-        if panel is not None:
-            break
 
         # 메시지가 봇이 보낸 것이고 임베드를 가지고 있는지 확인
         if msg.author.id == bot.user.id and msg.embeds:
@@ -227,7 +221,6 @@ async def retrieve_panel(ctx):
                 new_view = MusicControlPanel(bot, ctx)
                 await panel.edit(view=new_view)
 
-                await ctx.send("기존 패널 메시지를 재연결했습니다!", delete_after=3)
             else:
                 # 봇 메시지지만 패널이 아닌 다른 임베드라면 지울 수도 있음
                 await msg.delete()
@@ -247,8 +240,7 @@ async def play_next(ctx):
         author = temp[1]
         ctx.voice_client.play(player, after=lambda _: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
 
-        if panel is None:
-            await retrieve_panel(ctx)
+        await retrieve_panel(ctx)
 
         await update_panel(player.title, player.thumbnail, author)
     else:
@@ -335,8 +327,8 @@ class MusicControlPanel(View):
             color=0x1DB954,
         )
         for i, track in enumerate(music_queue, start=1):
-            embed.add_field(name=f"{i}. {track.title}", value=f"[링크]({track.url})", inline=False)
-        embed.set_thumbnail(url=music_queue[0].thumbnail)  # 첫 곡의 썸네일 설정
+            embed.add_field(name=f"{i}. {track[0].title}", value=f"[링크]({track[0].url})", inline=False)
+        embed.set_thumbnail(url=music_queue[0][0].thumbnail)  # 첫 곡의 썸네일 설정
         await interaction.response.send_message(embed=embed, ephemeral=True, delete_after=10)
 
     @discord.ui.button(label="⏭️ 다음 곡", style=discord.ButtonStyle.gray)
