@@ -133,6 +133,7 @@ is_playing = False
 async def add(ctx, *, url, author):
     """음악 대기열에 곡 추가"""
     global music_queue_lock
+    global is_playing
     async with ctx.typing():
         async with music_queue_lock:  # 락을 사용하여 동기화
             try:
@@ -151,7 +152,7 @@ async def add(ctx, *, url, author):
                 embed.set_thumbnail(url=player.thumbnail)
                 await ctx.send(embed=embed, delete_after=5)
 
-                if not is_playing:
+                if not is_playing and ctx.voice_client and not ctx.voice_client.is_playing():
                     await play_next(ctx)
 
             except Exception as e:
@@ -235,7 +236,7 @@ async def play_next(ctx):
 
     if music_queue:
         is_playing = True
-        temp = music_queue.pop()
+        temp = music_queue.pop(0)
         player = temp[0]
         author = temp[1]
         ctx.voice_client.play(player, after=lambda _: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
@@ -338,7 +339,7 @@ class MusicControlPanel(View):
             await interaction.response.send_message("대기열에 곡이 없습니다.", ephemeral=True, delete_after=5)
             return
         self.ctx.voice_client.stop()  # 기존 곡 정지
-        await play_next(self.ctx)
+
         await interaction.response.send_message("다음 곡을 재생합니다.", ephemeral=True, delete_after=5)
 
 
