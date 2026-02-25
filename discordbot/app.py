@@ -400,28 +400,20 @@ async def play_next(ctx: commands.Context) -> None:
 
     if not next_song:
         if state.autoplay and state.current_song_info and state.current_song_info.url:
-            if state.prefetched_song is not None:
-                # 미리 가져온 곡 즉시 사용 — 대기 없음
-                prefetched = state.prefetched_song
-                state.prefetched_song = None
-                await state.add_song(prefetched[0], prefetched[1])
-                next_song = await state.get_next_song()
-                logger.info("프리페치 추천곡 사용 (guild_id=%s, title=%s)", ctx.guild.id, prefetched[0].title)
-            else:
-                try:
-                    recommended_url = await YTDLSource.get_recommended_url(
-                        state.current_song_info.url,
-                        loop=bot.loop,
-                        exclude_ids=list(state.recently_played),
-                    )
-                    if recommended_url:
-                        async with state.ytdl_lock:
-                            player = await fetch_player_with_retry(recommended_url)
-                        await state.add_song(player, "자동재생")
-                        next_song = await state.get_next_song()
-                        logger.info("자동재생 추천곡 추가 (guild_id=%s, title=%s)", ctx.guild.id, player.title)
-                except Exception:
-                    logger.exception("자동재생 추천곡 가져오기 실패 (guild_id=%s)", ctx.guild.id)
+            try:
+                recommended_url = await YTDLSource.get_recommended_url(
+                    state.current_song_info.url,
+                    loop=bot.loop,
+                    exclude_ids=list(state.recently_played),
+                )
+                if recommended_url:
+                    async with state.ytdl_lock:
+                        player = await fetch_player_with_retry(recommended_url)
+                    await state.add_song(player, "자동재생")
+                    next_song = await state.get_next_song()
+                    logger.info("자동재생 추천곡 추가 (guild_id=%s, title=%s)", ctx.guild.id, player.title)
+            except Exception:
+                logger.exception("자동재생 추천곡 가져오기 실패 (guild_id=%s)", ctx.guild.id)
 
         if not next_song:
             state.reset_playback()
@@ -431,6 +423,8 @@ async def play_next(ctx: commands.Context) -> None:
     player, author = next_song
     state.is_playing = True
     state.current_song_info = player
+    # 새 곡 시작 시 이전 프리페치 제거 후 현재 곡 기준으로 새로 시작
+    state._cleanup_prefetched()
     if player.video_id:
         state.record_played(player.video_id)
 
@@ -444,7 +438,7 @@ async def play_next(ctx: commands.Context) -> None:
 
     # 큐가 비었고 자동재생 ON이면 다음 추천곡을 백그라운드에서 미리 준비
     queue_list = await state.get_queue_list()
-    if state.autoplay and not queue_list and state.prefetched_song is None:
+    if state.autoplay and not queue_list:
         bot.loop.create_task(prefetch_autoplay_song(ctx.guild.id))
 
     # 패널 메시지가 이미 있으면 채널 스캔 없이 바로 업데이트

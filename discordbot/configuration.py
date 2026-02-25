@@ -59,7 +59,7 @@ else:
 
 FFMPEG_OPTIONS = _config_ffmpeg_options or {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-    "options": "-vn",
+    "options": "-vn -ar 48000 -ac 2",
 }
 
 PANEL_COLOR = 0x1DB954
