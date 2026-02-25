@@ -1,0 +1,19 @@
+services:
+  bgutil:
+    build:
+      context: bgutil-ytdlp-pot-provider/server
+      target: server_node
+    restart: unless-stopped
+
+  bot:
+    build: .
+    env_file:
+      - .env
+    environment:
+      - BGUTIL_BASE_URL=http://bgutil:4416
+    depends_on:
+      - bgutil
+    restart: unless-stopped
+    # Optional: mount cookies.txt for YouTube authentication
+    # volumes:
+    #   - ./cookies.txt:/app/cookies.txt:ro
